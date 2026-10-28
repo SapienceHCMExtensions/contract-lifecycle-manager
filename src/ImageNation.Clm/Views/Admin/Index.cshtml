@@ -1,0 +1,74 @@
+@model AdminPage
+@{
+    ViewData["Title"] = "Settings";
+    decimal Rate(CurrencyCode code) => Model.Rates.First(r => r.Currency == code).UnitsPerUsd;
+    var leads = Model.LeadDays.OrderBy(d => d.Days).Select(d => d.Days).ToList();
+    int Lead(int index) => index < leads.Count ? leads[index] : 0;
+}
+<p class="kicker">Administration</p>
+<h1>Lists and authority</h1>
+<p class="lede">Agreement types, non-supplier categories, the USD threshold, exchange rates, and reminder lead times are configuration. They are not written into the approval code.</p>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <section class="panel">
+            <h2>Agreement types</h2>
+            <ul>
+            @foreach (var type in Model.Types)
+            {
+                <li class="d-flex justify-content-between align-items-center mb-2">
+                    <span>@type.Name @(type.IsActive ? "" : "(inactive)")</span>
+                    <form asp-action="ToggleType" method="post">
+                        <input type="hidden" name="id" value="@type.Id" />
+                        <button class="btn btn-sm btn-outline-dark" type="submit">@(type.IsActive ? "Deactivate" : "Activate")</button>
+                    </form>
+                </li>
+            }
+            </ul>
+            <form asp-action="AddType" method="post" class="d-flex gap-2">
+                <input class="form-control" name="name" placeholder="New agreement type" required />
+                <button class="btn btn-primary" type="submit">Add</button>
+            </form>
+        </section>
+    </div>
+    <div class="col-lg-6">
+        <section class="panel">
+            <h2>Non-supplier categories</h2>
+            <ul>
+            @foreach (var category in Model.Categories)
+            {
+                <li class="d-flex justify-content-between align-items-center mb-2">
+                    <span>@category.Name @(category.IsActive ? "" : "(inactive)")</span>
+                    <form asp-action="ToggleCategory" method="post">
+                        <input type="hidden" name="id" value="@category.Id" />
+                        <button class="btn btn-sm btn-outline-dark" type="submit">@(category.IsActive ? "Deactivate" : "Activate")</button>
+                    </form>
+                </li>
+            }
+            </ul>
+            <form asp-action="AddCategory" method="post" class="d-flex gap-2">
+                <input class="form-control" name="name" placeholder="New category" required />
+                <button class="btn btn-primary" type="submit">Add</button>
+            </form>
+        </section>
+    </div>
+</div>
+
+<section class="panel">
+    <h2>Delegation of authority and reminders</h2>
+    <p class="age">Rates are units of that currency per 1 USD. AED 3.6725 means 3.6725 dirhams equal one dollar. A value below the threshold uses the project approver. At or above it, the CFO then the Head of Legal. An international co-production adds the CEO.</p>
+    <form asp-action="SavePolicy" method="post" class="row g-3">
+        <div class="col-md-4">
+            <label class="form-label" for="thresholdUsd">Threshold, USD</label>
+            <input class="form-control" id="thresholdUsd" name="thresholdUsd" type="number" step="0.01" value="@Model.Policy.ThresholdUsd.ToString("0.##")" />
+        </div>
+        <div class="col-md-2"><label class="form-label">AED</label><input class="form-control" name="aed" type="number" step="0.0001" value="@Rate(CurrencyCode.AED)" /></div>
+        <div class="col-md-2"><label class="form-label">USD</label><input class="form-control" name="usd" type="number" step="0.0001" value="@Rate(CurrencyCode.USD)" /></div>
+        <div class="col-md-2"><label class="form-label">EUR</label><input class="form-control" name="eur" type="number" step="0.0001" value="@Rate(CurrencyCode.EUR)" /></div>
+        <div class="col-md-2"><label class="form-label">GBP</label><input class="form-control" name="gbp" type="number" step="0.0001" value="@Rate(CurrencyCode.GBP)" /></div>
+        <div class="col-md-4"><label class="form-label">Lead time 1</label><input class="form-control" name="lead1" type="number" value="@Lead(0)" /></div>
+        <div class="col-md-4"><label class="form-label">Lead time 2</label><input class="form-control" name="lead2" type="number" value="@Lead(1)" /></div>
+        <div class="col-md-4"><label class="form-label">Lead time 3</label><input class="form-control" name="lead3" type="number" value="@Lead(2)" /></div>
+        <div class="col-12"><button class="btn btn-primary" type="submit">Save policy</button></div>
+    </form>
+</section>

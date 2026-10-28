@@ -1,0 +1,119 @@
+@model DashboardPage
+@{
+    ViewData["Title"] = "Dashboard";
+    int Count(LifecycleStatus status) => Model.StatusCounts.GetValueOrDefault(status);
+    var inProcess = Model.StatusCounts.Where(p => Labels.ReportingOf(p.Key) == ReportingStatus.InProcess).Sum(p => p.Value);
+    var executed = Count(LifecycleStatus.ExecutedActive) + Count(LifecycleStatus.RenewalReview);
+}
+<p class="kicker">Portfolio</p>
+<h1>What needs a decision</h1>
+<p class="lede">@Model.Viewer.Name, this is the contractual position you are allowed to see. Dates inside the configured lead times sit at the top so option windows and locked cuts are not left to memory.</p>
+
+<div class="stat-grid mb-4">
+    <div class="stat"><b>@inProcess</b><span>In process</span></div>
+    <div class="stat"><b>@executed</b><span>Executed and still live</span></div>
+    <div class="stat"><b>@Model.ApprovalWaiting</b><span>Waiting on you</span></div>
+    <div class="stat"><b>@Model.OverdueCount</b><span>Overdue obligations</span></div>
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <section class="panel">
+            <h2>Inside @string.Join(" / ", Model.LeadDays) days</h2>
+            @if (Model.Horizon.Count == 0)
+            {
+                <div class="empty">Nothing in the current reminder window.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table align-middle">
+                        <thead><tr><th>When</th><th>Agreement</th><th>Item</th><th>Window</th></tr></thead>
+                        <tbody>
+                        @foreach (var row in Model.Horizon)
+                        {
+                            <tr>
+                                <td>@row.Date.ToString("dd MMM yyyy") <span class="age">@row.DaysUntil d</span></td>
+                                <td><a asp-controller="Contracts" asp-action="Details" asp-route-id="@row.ContractId">@row.PublicId</a><div class="age">@row.ContractName</div></td>
+                                <td>@row.Item</td>
+                                <td>@row.Bucket</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+        </section>
+        <section class="panel">
+            <h2>Overdue</h2>
+            @if (Model.Overdue.Count == 0)
+            {
+                <div class="empty">No open obligation is past its due date.</div>
+            }
+            else
+            {
+                <ul class="mb-0">
+                @foreach (var row in Model.Overdue)
+                {
+                    <li><a asp-controller="Contracts" asp-action="Details" asp-route-id="@row.ContractId">@row.PublicId</a> — @row.Item, due @row.Date.ToString("dd MMM yyyy")</li>
+                }
+                </ul>
+            }
+        </section>
+    </div>
+    <div class="col-lg-5">
+        <section class="panel" id="notices">
+            <h2>Notices</h2>
+            @if (Model.Notices.Count == 0)
+            {
+                <div class="empty">No notices yet. Assignment, approval, and clarification show up here instead of email.</div>
+            }
+            else
+            {
+                <ul class="list-unstyled mb-0">
+                @foreach (var notice in Model.Notices)
+                {
+                    <li class="mb-3">
+                        @if (notice.ContractId != null)
+                        {
+                            <a asp-controller="Contracts" asp-action="Details" asp-route-id="@notice.ContractId">@notice.Message</a>
+                        }
+                        else
+                        {
+                            @notice.Message
+                        }
+                        <div class="age">@notice.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm") @(notice.IsRead ? "" : "· unread")</div>
+                    </li>
+                }
+                </ul>
+            }
+        </section>
+        @if (Model.ShowWorkload)
+        {
+            <section class="panel">
+                <h2>Lawyer workload</h2>
+                @if (Model.Workload.Count == 0)
+                {
+                    <div class="empty">No lawyers are configured.</div>
+                }
+                else
+                {
+                    <table class="table mb-0">
+                        <thead><tr><th>Lawyer</th><th>Open</th><th>Oldest</th><th>Waiting</th></tr></thead>
+                        <tbody>
+                        @foreach (var row in Model.Workload)
+                        {
+                            <tr>
+                                <td>@row.Name</td>
+                                <td>@row.OpenCount</td>
+                                <td class="age">@row.OldestDays d</td>
+                                <td>@row.AwaitingCount</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                }
+            </section>
+        }
+    </div>
+</div>

@@ -1,0 +1,285 @@
+@model StartSheetPage
+@{
+    var editing = Model.Form.Id != null;
+    ViewData["Title"] = editing ? "Edit start sheet" : "Contract start sheet";
+}
+<p class="kicker">Proposal · 21 October 2026</p>
+<h1>@(editing ? "Edit the start sheet" : "Contract start sheet")</h1>
+<p class="lede">Department is taken from your sign-in and is not typed. VAT is 5% of the value you enter. A renewal, amendment, extension, variation, or additional service must name the agreement it changes.</p>
+<div asp-validation-summary="All" class="text-danger mb-3"></div>
+<form asp-action="@(editing ? "Edit" : "Create")" method="post" enctype="multipart/form-data">
+    <input type="hidden" asp-for="Form.Id" />
+    @if (Model.LockInitiation)
+    {
+        <input type="hidden" asp-for="Form.InitiationMethod" />
+        <input type="hidden" asp-for="Form.TemplateName" />
+    }
+    <section class="panel">
+        <h2>Agreement</h2>
+        <div class="sheet-grid two">
+            <div>
+                <label class="form-label" asp-for="Form.ContractName">Contract name</label>
+                <input class="form-control" asp-for="Form.ContractName" />
+                <span class="text-danger" asp-validation-for="Form.ContractName"></span>
+            </div>
+            <div>
+                <label class="form-label" asp-for="Form.AgreementTypeId">Agreement type</label>
+                <select class="form-select" asp-for="Form.AgreementTypeId">
+                    <option value="">Select</option>
+                    @foreach (var type in Model.AgreementTypes)
+                    {
+                        <option value="@type.Id">@type.Name</option>
+                    }
+                </select>
+                <span class="text-danger" asp-validation-for="Form.AgreementTypeId"></span>
+            </div>
+            <div>
+                <label class="form-label" asp-for="Form.RequestNature">New, renewal, or change</label>
+                <select class="form-select" asp-for="Form.RequestNature">
+                    <option value="">Select</option>
+                    @foreach (RequestNature nature in Enum.GetValues<RequestNature>())
+                    {
+                        <option value="@nature">@Labels.Text(nature)</option>
+                    }
+                </select>
+                <span class="text-danger" asp-validation-for="Form.RequestNature"></span>
+            </div>
+            <div>
+                <label class="form-label" asp-for="Form.InitiationMethod">How the draft starts</label>
+                @if (Model.LockInitiation)
+                {
+                    <input class="form-control" value="@Labels.Text(Model.Form.InitiationMethod!.Value)" readonly />
+                }
+                else
+                {
+                    <select class="form-select" asp-for="Form.InitiationMethod">
+                        <option value="">Select</option>
+                        @foreach (InitiationMethod method in Enum.GetValues<InitiationMethod>())
+                        {
+                            <option value="@method">@Labels.Text(method)</option>
+                        }
+                    </select>
+                }
+                <span class="text-danger" asp-validation-for="Form.InitiationMethod"></span>
+            </div>
+        </div>
+        @if (!Model.LockInitiation)
+        {
+            <div id="template-block" class="mt-3" hidden>
+                <label class="form-label" asp-for="Form.TemplateName">Approved template</label>
+                <select class="form-select" asp-for="Form.TemplateName">
+                    <option value="">Select</option>
+                    @foreach (var template in ApprovedTemplates.All)
+                    {
+                        <option>@template</option>
+                    }
+                </select>
+                <span class="text-danger" asp-validation-for="Form.TemplateName"></span>
+            </div>
+            <div id="upload-block" class="mt-3" hidden>
+                <label class="form-label" asp-for="Form.DraftFile">Third-party draft</label>
+                <input class="form-control" asp-for="Form.DraftFile" type="file" />
+                <span class="text-danger" asp-validation-for="Form.DraftFile"></span>
+            </div>
+        }
+        <div id="parent-block" class="mt-3" hidden>
+            <label class="form-label" asp-for="Form.ParentContractId">Parent agreement</label>
+            <select class="form-select" asp-for="Form.ParentContractId">
+                <option value="">Select the agreement this changes</option>
+                @foreach (var parent in Model.Parents)
+                {
+                    <option value="@parent.Id">@parent.Label</option>
+                }
+            </select>
+            <span class="text-danger" asp-validation-for="Form.ParentContractId"></span>
+        </div>
+        <div class="mt-3">
+            <label class="form-label" asp-for="Form.Description">Description</label>
+            <textarea class="form-control" asp-for="Form.Description" rows="3"></textarea>
+        </div>
+        <div class="sheet-grid two mt-3">
+            <div>
+                <label class="form-label" asp-for="Form.StartDate">Start date</label>
+                <input class="form-control" asp-for="Form.StartDate" type="date" />
+            </div>
+            <div>
+                <label class="form-label" asp-for="Form.EndDate">End date</label>
+                <input class="form-control" asp-for="Form.EndDate" type="date" />
+                <span class="text-danger" asp-validation-for="Form.EndDate"></span>
+            </div>
+        </div>
+    </section>
+
+    <section class="panel">
+        <h2>Image Nation party</h2>
+        <div class="sheet-grid two">
+            <div>
+                <label class="form-label" asp-for="Form.InsEntityId">INS contracting party</label>
+                <select class="form-select" asp-for="Form.InsEntityId">
+                    <option value="">Select</option>
+                    @foreach (var entity in Model.InsEntities)
+                    {
+                        <option value="@entity.Id">@entity.Name</option>
+                    }
+                </select>
+                <span class="text-danger" asp-validation-for="Form.InsEntityId"></span>
+            </div>
+            <div>
+                <label class="form-label">Department</label>
+                <input class="form-control" value="@Model.Department" readonly />
+                <div class="form-text">Taken from @Model.InitiatorName’s sign-in.</div>
+            </div>
+            <div>
+                <label class="form-label" asp-for="Form.ProjectChoice">Project / title</label>
+                <select class="form-select" asp-for="Form.ProjectChoice">
+                    <option value="">Select a title</option>
+                    <option value="new">Create a new title</option>
+                    @foreach (var project in Model.Projects)
+                    {
+                        <option value="@project.Id">@project.Name</option>
+                    }
+                </select>
+                <span class="text-danger" asp-validation-for="Form.ProjectChoice"></span>
+            </div>
+            <div id="new-project" hidden>
+                <label class="form-label" asp-for="Form.NewProjectName">New title</label>
+                <input class="form-control" asp-for="Form.NewProjectName" />
+                <span class="text-danger" asp-validation-for="Form.NewProjectName"></span>
+            </div>
+            <div>
+                <label class="form-label" asp-for="Form.ProjectOwner">Project owner</label>
+                <input class="form-control" asp-for="Form.ProjectOwner" />
+                <span class="text-danger" asp-validation-for="Form.ProjectOwner"></span>
+            </div>
+            <div class="form-check mt-4">
+                <input class="form-check-input" asp-for="Form.InternationalCoProduction" />
+                <label class="form-check-label" asp-for="Form.InternationalCoProduction">International co-production — adds the CEO route</label>
+            </div>
+        </div>
+    </section>
+
+    <section class="panel">
+        <h2>Other contracting party</h2>
+        <div class="sheet-grid two">
+            <div>
+                <label class="form-label" asp-for="Form.OtherPartyName">Legal name</label>
+                <input class="form-control" asp-for="Form.OtherPartyName" />
+                <span class="text-danger" asp-validation-for="Form.OtherPartyName"></span>
+            </div>
+            <div>
+                <label class="form-label" asp-for="Form.OtherPartyReference">Party reference</label>
+                <input class="form-control" asp-for="Form.OtherPartyReference" placeholder="Leave blank to assign one" />
+            </div>
+            <div>
+                <label class="form-label" asp-for="Form.OtherPartyKind">Company or individual</label>
+                <select class="form-select" asp-for="Form.OtherPartyKind">
+                    <option value="">Select</option>
+                    <option value="Company">Company</option>
+                    <option value="Individual">Individual</option>
+                </select>
+                <span class="text-danger" asp-validation-for="Form.OtherPartyKind"></span>
+            </div>
+            <div>
+                <label class="form-label" asp-for="Form.NonSupplierCategoryId">Non-supplier category</label>
+                <select class="form-select" asp-for="Form.NonSupplierCategoryId">
+                    <option value="">Select</option>
+                    @foreach (var category in Model.Categories)
+                    {
+                        <option value="@category.Id">@category.Name</option>
+                    }
+                </select>
+                <span class="text-danger" asp-validation-for="Form.NonSupplierCategoryId"></span>
+            </div>
+            <div>
+                <label class="form-label" asp-for="Form.Address">Address</label>
+                <textarea class="form-control" asp-for="Form.Address" rows="2"></textarea>
+                <span class="text-danger" asp-validation-for="Form.Address"></span>
+            </div>
+            <div>
+                <label class="form-label" asp-for="Form.ResidenceRegion">Place of residence or establishment</label>
+                <select class="form-select" asp-for="Form.ResidenceRegion">
+                    <option value="">Select</option>
+                    @foreach (ResidenceRegion region in Enum.GetValues<ResidenceRegion>())
+                    {
+                        <option value="@region">@Labels.Text(region)</option>
+                    }
+                </select>
+                <span class="text-danger" asp-validation-for="Form.ResidenceRegion"></span>
+            </div>
+            <div>
+                <label class="form-label" asp-for="Form.SpecificPlace">Specific place</label>
+                <input class="form-control" asp-for="Form.SpecificPlace" />
+                <span class="text-danger" asp-validation-for="Form.SpecificPlace"></span>
+            </div>
+            <div>
+                <label class="form-label" asp-for="Form.Country">Country</label>
+                <input class="form-control" asp-for="Form.Country" />
+            </div>
+            <div>
+                <label class="form-label" id="identity-label" asp-for="Form.IdentityDocument">Trade licence</label>
+                <input class="form-control" asp-for="Form.IdentityDocument" type="file" />
+                @if (!string.IsNullOrEmpty(Model.ExistingIdentityName))
+                {
+                    <div class="form-text">On file: @Model.ExistingIdentityName. Upload only to replace it.</div>
+                }
+                <span class="text-danger" asp-validation-for="Form.IdentityDocument"></span>
+            </div>
+        </div>
+    </section>
+
+    <section class="panel">
+        <h2>Commercial terms</h2>
+        <div class="sheet-grid two">
+            <div>
+                <label class="form-label" asp-for="Form.ContractValueExVat">Contract value, exclusive of VAT</label>
+                <input class="form-control" asp-for="Form.ContractValueExVat" type="number" step="0.01" min="0" />
+                <span class="text-danger" asp-validation-for="Form.ContractValueExVat"></span>
+            </div>
+            <div>
+                <label class="form-label" asp-for="Form.Currency">Currency</label>
+                <select class="form-select" asp-for="Form.Currency">
+                    <option value="">Select</option>
+                    @foreach (CurrencyCode currency in Enum.GetValues<CurrencyCode>())
+                    {
+                        <option value="@currency">@currency</option>
+                    }
+                </select>
+                <span class="text-danger" asp-validation-for="Form.Currency"></span>
+            </div>
+        </div>
+        <div class="sheet-grid two mt-3">
+            <div class="money-box">
+                <div class="age">VAT, 5% of the contract value</div>
+                <strong id="vat-amount">—</strong>
+            </div>
+            <div class="money-box">
+                <div class="age">Total contract value</div>
+                <strong id="total-amount">—</strong>
+            </div>
+        </div>
+        <div class="mt-3">
+            <label class="form-label" asp-for="Form.PaymentTerms">Payment terms</label>
+            <textarea class="form-control" asp-for="Form.PaymentTerms" rows="2"></textarea>
+            <span class="text-danger" asp-validation-for="Form.PaymentTerms"></span>
+        </div>
+        <div class="sheet-grid two mt-3">
+            <div>
+                <label class="form-label" asp-for="Form.PayerInvoicingEntity">Payer invoicing entity</label>
+                <input class="form-control" asp-for="Form.PayerInvoicingEntity" />
+                <span class="text-danger" asp-validation-for="Form.PayerInvoicingEntity"></span>
+            </div>
+            <div>
+                <label class="form-label" asp-for="Form.PayeeInvoicingEntity">Payee invoicing entity</label>
+                <input class="form-control" asp-for="Form.PayeeInvoicingEntity" />
+                <span class="text-danger" asp-validation-for="Form.PayeeInvoicingEntity"></span>
+            </div>
+        </div>
+    </section>
+    <div class="d-flex gap-2">
+        <button class="btn btn-primary" type="submit">@(editing ? "Save start sheet" : "Submit to Legal")</button>
+        <a class="btn btn-outline-dark" asp-action="Index">Cancel</a>
+    </div>
+</form>
+@section Scripts {
+    <partial name="_ValidationScriptsPartial" />
+}

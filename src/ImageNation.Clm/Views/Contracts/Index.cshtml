@@ -1,0 +1,138 @@
+@model ContractIndexPage
+@{
+    ViewData["Title"] = "Register";
+    var pages = Math.Max(1, (int)Math.Ceiling(Model.Total / (double)Model.PageSize));
+}
+<div class="d-flex flex-wrap justify-content-between align-items-end gap-3 mb-3">
+    <div>
+        <p class="kicker">Repository</p>
+        <h1 class="mb-1">Agreements</h1>
+        <p class="lede mb-0">@Model.Total in this view. Search by contract number, name, or the other party.</p>
+    </div>
+    <a class="btn btn-primary" asp-action="Create">New start sheet</a>
+</div>
+<form method="get" class="panel">
+    <div class="row g-2">
+        <div class="col-md-4">
+            <label class="form-label" for="Q">Search</label>
+            <input class="form-control" id="Q" name="Q" value="@Model.Filter.Q" />
+        </div>
+        <div class="col-md-4">
+            <label class="form-label" for="ProjectId">Title</label>
+            <select class="form-select" id="ProjectId" name="ProjectId">
+                <option value="">Any title</option>
+                @foreach (var project in Model.Projects)
+                {
+                    if (Model.Filter.ProjectId == project.Id)
+                    {
+                        <option value="@project.Id" selected>@project.Name</option>
+                    }
+                    else
+                    {
+                        <option value="@project.Id">@project.Name</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-md-4">
+            <label class="form-label" for="TypeId">Agreement type</label>
+            <select class="form-select" id="TypeId" name="TypeId">
+                <option value="">Any type</option>
+                @foreach (var type in Model.Types)
+                {
+                    if (Model.Filter.TypeId == type.Id)
+                    {
+                        <option value="@type.Id" selected>@type.Name</option>
+                    }
+                    else
+                    {
+                        <option value="@type.Id">@type.Name</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="Department">Department</label>
+            <select class="form-select" id="Department" name="Department">
+                <option value="">Any department</option>
+                @foreach (var department in Model.Departments)
+                {
+                    if (Model.Filter.Department == department)
+                    {
+                        <option value="@department" selected>@department</option>
+                    }
+                    else
+                    {
+                        <option value="@department">@department</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="LawyerId">Lawyer</label>
+            <select class="form-select" id="LawyerId" name="LawyerId">
+                <option value="">Anyone</option>
+                @foreach (var lawyer in Model.Lawyers)
+                {
+                    if (Model.Filter.LawyerId == lawyer.Id)
+                    {
+                        <option value="@lawyer.Id" selected>@lawyer.Name</option>
+                    }
+                    else
+                    {
+                        <option value="@lawyer.Id">@lawyer.Name</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="Status">Status</label>
+            <select class="form-select" id="Status" name="Status">
+                <option value="">Any status</option>
+                @foreach (LifecycleStatus status in Enum.GetValues<LifecycleStatus>())
+                {
+                    if (Model.Filter.Status == status)
+                    {
+                        <option value="@status" selected>@Labels.Text(status)</option>
+                    }
+                    else
+                    {
+                        <option value="@status">@Labels.Text(status)</option>
+                    }
+                }
+            </select>
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="Owner">Project owner</label>
+            <input class="form-control" id="Owner" name="Owner" value="@Model.Filter.Owner" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="EndFrom">End from</label>
+            <input class="form-control" type="date" id="EndFrom" name="EndFrom" value="@Model.Filter.EndFrom?.ToString("yyyy-MM-dd")" />
+        </div>
+        <div class="col-md-3">
+            <label class="form-label" for="EndTo">End to</label>
+            <input class="form-control" type="date" id="EndTo" name="EndTo" value="@Model.Filter.EndTo?.ToString("yyyy-MM-dd")" />
+        </div>
+        <div class="col-md-6 d-flex align-items-end gap-2">
+            <button class="btn btn-primary" type="submit">Filter</button>
+            <a class="btn btn-outline-dark" asp-action="Index">Clear</a>
+            @if (Model.CanExport)
+            {
+                <a class="btn btn-outline-dark" asp-action="Export" asp-route-Q="@Model.Filter.Q" asp-route-ProjectId="@Model.Filter.ProjectId" asp-route-TypeId="@Model.Filter.TypeId" asp-route-Department="@Model.Filter.Department" asp-route-LawyerId="@Model.Filter.LawyerId" asp-route-Status="@Model.Filter.Status" asp-route-Owner="@Model.Filter.Owner" asp-route-EndFrom="@Model.Filter.EndFrom?.ToString("yyyy-MM-dd")" asp-route-EndTo="@Model.Filter.EndTo?.ToString("yyyy-MM-dd")">Export CSV</a>
+            }
+        </div>
+    </div>
+</form>
+<section class="panel">
+    <partial name="_ContractTable" model="Model.Rows" />
+    @if (pages > 1)
+    {
+        <nav class="d-flex gap-2" aria-label="Pages">
+            @for (var pageNumber = 1; pageNumber <= pages; pageNumber++)
+            {
+                <a class="btn btn-sm @(pageNumber == Model.Page ? "btn-primary" : "btn-outline-dark")" asp-action="Index" asp-route-Page="@pageNumber" asp-route-Q="@Model.Filter.Q" asp-route-ProjectId="@Model.Filter.ProjectId" asp-route-TypeId="@Model.Filter.TypeId" asp-route-Department="@Model.Filter.Department" asp-route-LawyerId="@Model.Filter.LawyerId" asp-route-Status="@Model.Filter.Status" asp-route-Owner="@Model.Filter.Owner">@pageNumber</a>
+            }
+        </nav>
+    }
+</section>

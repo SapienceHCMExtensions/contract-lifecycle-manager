@@ -1,0 +1,9 @@
+bin/
+obj/
+.vs/
+.idea/
+*.user
+App_Data/
+src/ImageNation.Clm/App_Data/
+*.log
+.dotnet/

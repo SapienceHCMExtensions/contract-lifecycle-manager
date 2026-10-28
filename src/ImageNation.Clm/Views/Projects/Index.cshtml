@@ -1,0 +1,22 @@
+@model ProjectListPage
+@{
+    ViewData["Title"] = "Titles";
+}
+<p class="kicker">Slate</p>
+<h1>Projects and titles</h1>
+<p class="lede">Agreements sit under the title they belong to. Counts are the agreements your persona is allowed to see.</p>
+<div class="persona-grid">
+@foreach (var card in Model.Projects)
+{
+    <a class="persona-card text-decoration-none text-reset" asp-action="Details" asp-route-id="@card.Project.Id">
+        <strong>@card.Project.Name</strong>
+        <small>@card.Project.InternalCode · @card.Project.Status</small>
+        <small>@card.Project.ProductionEntity</small>
+        <small>@card.VisibleAgreements agreement@(card.VisibleAgreements == 1 ? "" : "s") · @card.Project.BusinessOwner</small>
+    </a>
+}
+</div>
+@if (Model.Projects.Count == 0)
+{
+    <div class="empty mt-3">No titles yet. A start sheet can create one.</div>
+}

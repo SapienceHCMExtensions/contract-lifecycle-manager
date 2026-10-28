@@ -1,0 +1,43 @@
+@model IReadOnlyList<ContractRow>
+@if (Model.Count == 0)
+{
+    <div class="empty">No agreements match this view.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead>
+                <tr>
+                    <th>Agreement</th>
+                    <th>Title</th>
+                    <th>Party</th>
+                    <th>Status</th>
+                    <th>Value</th>
+                    <th>Age</th>
+                </tr>
+            </thead>
+            <tbody>
+            @foreach (var row in Model)
+            {
+                var age = Math.Max(0, (DateTime.UtcNow - row.CreatedAt.UtcDateTime).Days);
+                <tr>
+                    <td>
+                        <a asp-controller="Contracts" asp-action="Details" asp-route-id="@row.Id">@row.PublicId</a>
+                        <div>@row.ContractName</div>
+                        <div class="age">@row.Type · @row.Department @(row.Lawyer == null ? "" : "· " + row.Lawyer)</div>
+                    </td>
+                    <td>@row.Project</td>
+                    <td>@row.Party</td>
+                    <td>
+                        <span class="status @Labels.StatusCss(row.Status)">@Labels.Text(row.Status)</span>
+                        <div class="age">@Labels.Text(Labels.ReportingOf(row.Status))</div>
+                    </td>
+                    <td>@Labels.Money(row.Value, row.Currency)</td>
+                    <td class="age">@age d<div>@Labels.NextAction(row.Status)</div></td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}

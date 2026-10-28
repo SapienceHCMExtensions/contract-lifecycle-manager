@@ -1,0 +1,33 @@
+@model ApprovalQueuePage
+@{
+    ViewData["Title"] = "Approvals";
+}
+<p class="kicker">Delegation of authority</p>
+<h1>Waiting on you</h1>
+<p class="lede">Only the current step in the route is shown. Later approvers are asked after the person ahead of them decides.</p>
+<section class="panel">
+@if (Model.Rows.Count == 0)
+{
+    <div class="empty">Nothing is waiting on you.</div>
+}
+else
+{
+    <div class="table-responsive">
+        <table class="table align-middle">
+            <thead><tr><th>Agreement</th><th>Route</th><th>Value</th><th>Owner</th><th>Since</th></tr></thead>
+            <tbody>
+            @foreach (var row in Model.Rows)
+            {
+                <tr>
+                    <td><a asp-controller="Contracts" asp-action="Details" asp-route-id="@row.ContractId">@row.PublicId</a><div>@row.ContractName</div></td>
+                    <td>@row.Route</td>
+                    <td>@Labels.Money(row.Value, row.Currency)</td>
+                    <td>@row.Owner</td>
+                    <td class="age">@row.Since.ToLocalTime().ToString("dd MMM yyyy")</td>
+                </tr>
+            }
+            </tbody>
+        </table>
+    </div>
+}
+</section>

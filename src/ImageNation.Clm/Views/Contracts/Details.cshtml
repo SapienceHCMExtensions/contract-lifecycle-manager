@@ -1,0 +1,518 @@
+@model ContractDetailsPage
+@{
+    ViewData["Title"] = Model.Contract.PublicId;
+    var c = Model.Contract;
+    var canTriage = Access.CanTriage(Model.Viewer);
+    var canDraft = Access.CanDraft(Model.Viewer, c);
+    var canEdit = Access.CanEdit(Model.Viewer, c);
+    var canObligations = Access.CanManageObligations(Model.Viewer, c);
+    var rounds = c.ApprovalSteps.GroupBy(s => s.Round).OrderByDescending(g => g.Key).ToList();
+    var signRounds = c.Signatories.GroupBy(s => s.Round).OrderByDescending(g => g.Key).ToList();
+    var latestSign = signRounds.FirstOrDefault()?.OrderBy(s => s.SigningOrder).ToList() ?? [];
+    var nextSigner = latestSign.FirstOrDefault(s => s.State == SignatureState.Pending);
+}
+<p class="kicker">@c.ProjectTitle.Name</p>
+<div class="d-flex flex-wrap justify-content-between gap-3 align-items-start">
+    <div>
+        <h1 class="mb-1">@c.ContractName</h1>
+        <div class="d-flex flex-wrap gap-2 align-items-center">
+            <strong>@c.PublicId</strong>
+            <span class="status @Labels.StatusCss(c.LifecycleStatus)">@Labels.Text(c.LifecycleStatus)</span>
+            <span class="status status-mute">@Labels.Text(Labels.ReportingOf(c.LifecycleStatus))</span>
+            @if (c.DocumentLocked)
+            {
+                <span class="status status-wait">Document locked</span>
+            }
+        </div>
+        <p class="lede mt-2 mb-0">@Labels.NextAction(c.LifecycleStatus). Raised by @c.Initiator.Name in @c.Department. @(c.AssignedLawyer == null ? "No lawyer assigned." : "With " + c.AssignedLawyer.Name + ".")</p>
+    </div>
+    @if (canEdit)
+    {
+        <a class="btn btn-outline-dark" asp-action="Edit" asp-route-id="@c.Id">Edit start sheet</a>
+    }
+</div>
+
+@if (!string.IsNullOrWhiteSpace(c.ClarificationNote))
+{
+    <div class="alert alert-warning mt-3" role="status">Legal asked for this: @c.ClarificationNote</div>
+}
+
+<div class="d-flex flex-wrap gap-2 my-3">
+    @if (canTriage && c.LifecycleStatus == LifecycleStatus.Requested)
+    {
+        <form asp-action="Accept" asp-route-id="@c.Id" method="post"><button class="btn btn-primary" type="submit">Accept into legal review</button></form>
+    }
+    @if (c.LifecycleStatus == LifecycleStatus.Requested && !string.IsNullOrWhiteSpace(c.ClarificationNote) && (Model.Viewer.Id == c.InitiatorId || canTriage))
+    {
+        <form asp-action="Resubmit" asp-route-id="@c.Id" method="post"><button class="btn btn-primary" type="submit">Resubmit to Legal</button></form>
+    }
+    @if ((canTriage || canDraft) && c.LifecycleStatus == LifecycleStatus.LegalReview)
+    {
+        <form asp-action="BeginDrafting" asp-route-id="@c.Id" method="post"><button class="btn btn-primary" type="submit">Open drafting</button></form>
+    }
+    @if (canDraft && c.LifecycleStatus == LifecycleStatus.Drafting)
+    {
+        <form asp-action="MarkNegotiation" asp-route-id="@c.Id" method="post"><button class="btn btn-outline-dark" type="submit">Mark in negotiation</button></form>
+    }
+    @if (canDraft && c.LifecycleStatus == LifecycleStatus.Returned)
+    {
+        <form asp-action="ResumeDrafting" asp-route-id="@c.Id" method="post"><button class="btn btn-outline-dark" type="submit">Resume drafting</button></form>
+    }
+    @if (canDraft && c.LifecycleStatus is LifecycleStatus.Drafting or LifecycleStatus.Negotiation or LifecycleStatus.Returned)
+    {
+        <form asp-action="SubmitApproval" asp-route-id="@c.Id" method="post"><button class="btn btn-primary" type="submit">Submit for approval</button></form>
+    }
+    @if ((canDraft || canTriage) && c.LifecycleStatus is LifecycleStatus.ExecutedActive)
+    {
+        <form asp-action="StartRenewal" asp-route-id="@c.Id" method="post"><button class="btn btn-outline-dark" type="submit">Open renewal review</button></form>
+    }
+</div>
+
+<div class="row g-3">
+    <div class="col-lg-7">
+        <section class="panel">
+            <h2>Start sheet</h2>
+            <dl class="sheet row mb-0">
+                <div class="col-md-6"><dt>Agreement type</dt><dd>@c.AgreementType.Name</dd></div>
+                <div class="col-md-6"><dt>Request</dt><dd>@Labels.Text(c.RequestNature)</dd></div>
+                <div class="col-md-6"><dt>Draft started</dt><dd>@Labels.Text(c.InitiationMethod)@(string.IsNullOrEmpty(c.TemplateName) ? "" : " · " + c.TemplateName)</dd></div>
+                <div class="col-md-6"><dt>INS contracting party</dt><dd>@c.InsEntity.Name</dd></div>
+                <div class="col-md-6"><dt>Department</dt><dd>@c.Department</dd></div>
+                <div class="col-md-6"><dt>Project owner</dt><dd>@c.ProjectOwner</dd></div>
+                <div class="col-md-6"><dt>Other party</dt><dd>@c.OtherPartyName <span class="age">@c.OtherPartyReference</span></dd></div>
+                <div class="col-md-6"><dt>Party kind</dt><dd>@Labels.Text(c.OtherPartyKind)</dd></div>
+                <div class="col-md-6"><dt>Non-supplier category</dt><dd>@c.NonSupplierCategory.Name</dd></div>
+                <div class="col-md-6"><dt>Residence</dt><dd>@Labels.Text(c.ResidenceRegion) · @c.SpecificPlace</dd></div>
+                <div class="col-md-6"><dt>Address</dt><dd>@c.Address</dd></div>
+                <div class="col-md-6"><dt>Country</dt><dd>@(c.Country ?? "—")</dd></div>
+                <div class="col-md-6"><dt>Value exclusive of VAT</dt><dd>@Labels.Money(c.ContractValueExVat, c.Currency)</dd></div>
+                <div class="col-md-6"><dt>VAT 5%</dt><dd>@Labels.Money(c.VatAmount, c.Currency)</dd></div>
+                <div class="col-md-6"><dt>Total</dt><dd>@Labels.Money(c.TotalValue, c.Currency)</dd></div>
+                <div class="col-md-6"><dt>USD equivalent</dt><dd>@(Model.ValueUsd == null ? "No rate" : Model.ValueUsd.Value.ToString("N2") + " USD")</dd></div>
+                <div class="col-md-6"><dt>Payment terms</dt><dd>@c.PaymentTerms</dd></div>
+                <div class="col-md-6"><dt>Payer</dt><dd>@c.PayerInvoicingEntity</dd></div>
+                <div class="col-md-6"><dt>Payee</dt><dd>@c.PayeeInvoicingEntity</dd></div>
+                <div class="col-md-6"><dt>Dates</dt><dd>@(c.StartDate?.ToString("dd MMM yyyy") ?? "—") to @(c.EndDate?.ToString("dd MMM yyyy") ?? "—")</dd></div>
+                <div class="col-md-6"><dt>Co-production</dt><dd>@(c.InternationalCoProduction ? "Yes, exceptional route" : "No")</dd></div>
+                @if (c.ParentContract != null)
+                {
+                    <div class="col-md-6"><dt>Parent</dt><dd><a asp-action="Details" asp-route-id="@c.ParentContract.Id">@c.ParentContract.PublicId</a></dd></div>
+                }
+            </dl>
+            @if (!string.IsNullOrWhiteSpace(c.Description))
+            {
+                <p class="mb-0">@c.Description</p>
+            }
+        </section>
+
+        <section class="panel">
+            <h2>Drafts</h2>
+            <p class="age">Earlier versions stay read-only. A note on each version is how changes are identified.</p>
+            @if (c.Versions.Count == 0)
+            {
+                <div class="empty">No draft has been filed.</div>
+            }
+            else
+            {
+                <div class="table-responsive">
+                    <table class="table">
+                        <thead><tr><th>#</th><th>File</th><th>Kind</th><th>By</th><th>Note</th></tr></thead>
+                        <tbody>
+                        @foreach (var version in c.Versions.OrderByDescending(v => v.VersionNumber))
+                        {
+                            <tr>
+                                <td>@version.VersionNumber @(version.IsCurrent ? "current" : "")</td>
+                                <td><a asp-action="DownloadVersion" asp-route-id="@version.Id">@version.FileName</a></td>
+                                <td>@Labels.Text(version.Kind) @(version.IsLocked ? "· locked" : "")</td>
+                                <td>@version.CreatedBy.Name<div class="age">@version.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</div></td>
+                                <td>@version.ChangeNote</td>
+                            </tr>
+                        }
+                        </tbody>
+                    </table>
+                </div>
+            }
+            @if (canEdit && !c.DocumentLocked)
+            {
+                <form asp-action="UploadVersion" asp-route-id="@c.Id" method="post" enctype="multipart/form-data" class="row g-2">
+                    <div class="col-md-5"><input class="form-control" type="file" name="file" required /></div>
+                    <div class="col-md-5"><input class="form-control" name="changeNote" placeholder="What changed" required /></div>
+                    <div class="col-md-2"><button class="btn btn-outline-dark w-100" type="submit">Add version</button></div>
+                </form>
+            }
+        </section>
+
+        <section class="panel">
+            <h2>Approval</h2>
+            @if (!string.IsNullOrWhiteSpace(c.RouteExplanation))
+            {
+                <p>@c.RouteExplanation</p>
+            }
+            else if (Model.LiveRoute != null)
+            {
+                <p>@Model.LiveRoute.Explanation</p>
+            }
+            @if (rounds.Count == 0)
+            {
+                <div class="empty">No approval round yet. The route above is what submission would use.</div>
+            }
+            @foreach (var round in rounds)
+            {
+                <h3 class="h6">Round @round.Key</h3>
+                <ol>
+                @foreach (var step in round.OrderBy(s => s.Sequence))
+                {
+                    <li>
+                        <strong>@Labels.Text(step.RouteKind)</strong> — @step.Approver.Name, @step.Approver.Title
+                        <span class="status @(step.Outcome == ApprovalOutcome.Approved ? "status-ok" : step.Outcome == ApprovalOutcome.Rejected ? "status-bad" : "status-mute")">@Labels.Text(step.Outcome)</span>
+                        @if (step.IsActionable) { <span class="age">current</span> }
+                        <div class="age">@step.RouteExplanation @(step.AdHocReason == null ? "" : "· " + step.AdHocReason)</div>
+                        @if (!string.IsNullOrWhiteSpace(step.Comment)) { <div>@step.Comment</div> }
+                        @if (step.DecidedAt != null) { <div class="age">@step.DecidedAt.Value.ToLocalTime().ToString("dd MMM yyyy HH:mm")</div> }
+                    </li>
+                }
+                </ol>
+            }
+            @if (Model.ActionableStep != null)
+            {
+                <form asp-action="Decide" asp-route-id="@c.Id" method="post" class="row g-2">
+                    <div class="col-12"><textarea class="form-control" name="comment" rows="2" placeholder="Comment. Required if you reject."></textarea></div>
+                    <div class="col-auto"><button class="btn btn-primary" name="decision" value="approve" type="submit">Approve</button></div>
+                    <div class="col-auto"><button class="btn btn-outline-dark" name="decision" value="reject" type="submit">Reject</button></div>
+                </form>
+            }
+            @if ((canDraft || canTriage) && c.LifecycleStatus == LifecycleStatus.AwaitingApproval)
+            {
+                <form asp-action="AdHoc" asp-route-id="@c.Id" method="post" class="row g-2 mt-2">
+                    <div class="col-md-5">
+                        <select class="form-select" name="approverId" required>
+                            <option value="">Add an approver</option>
+                            @foreach (var person in Model.People)
+                            {
+                                <option value="@person.Id">@person.Name · @person.Title</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-5"><input class="form-control" name="reason" placeholder="Why this person" required /></div>
+                    <div class="col-md-2"><button class="btn btn-outline-dark w-100" type="submit">Insert</button></div>
+                </form>
+            }
+            @if (canDraft && c.LifecycleStatus is LifecycleStatus.AwaitingApproval or LifecycleStatus.Approved or LifecycleStatus.AwaitingSignature or LifecycleStatus.PartiallySigned)
+            {
+                <form asp-action="Withdraw" asp-route-id="@c.Id" method="post" class="row g-2 mt-2">
+                    <div class="col-md-9"><input class="form-control" name="reason" placeholder="Why withdraw to drafting" required /></div>
+                    <div class="col-md-3"><button class="btn btn-outline-dark w-100" type="submit">Withdraw</button></div>
+                </form>
+            }
+        </section>
+    </div>
+    <div class="col-lg-5">
+        <section class="panel">
+            <h2>Signature</h2>
+            <p class="age">E-sign is simulated. Legal records each signer in order. A paper signing is a separate upload and does not replace the approved version.</p>
+            @if (c.ExecutionDate != null)
+            {
+                <p>Executed @c.ExecutionDate?.ToString("dd MMM yyyy"). @c.ExecutionSignatories</p>
+            }
+            @foreach (var round in signRounds)
+            {
+                <h3 class="h6">Signing round @round.Key</h3>
+                <ol>
+                @foreach (var signer in round.OrderBy(s => s.SigningOrder))
+                {
+                    <li>@signer.Name <span class="age">@signer.Organization</span> — @Labels.Text(signer.State)</li>
+                }
+                </ol>
+            }
+            @if (canDraft && c.LifecycleStatus == LifecycleStatus.Approved)
+            {
+                <form asp-action="SendSignature" asp-route-id="@c.Id" method="post" class="mb-3">
+                    <div class="mb-2"><input class="form-control mb-1" name="signers[0].Name" placeholder="First signatory" /><input class="form-control" name="signers[0].Organization" placeholder="Organisation" /></div>
+                    <div class="mb-2"><input class="form-control mb-1" name="signers[1].Name" placeholder="Second signatory" /><input class="form-control" name="signers[1].Organization" placeholder="Organisation" /></div>
+                    <div class="mb-2"><input class="form-control mb-1" name="signers[2].Name" placeholder="Third signatory, if needed" /><input class="form-control" name="signers[2].Organization" placeholder="Organisation" /></div>
+                    <button class="btn btn-primary" type="submit">Send for signature</button>
+                </form>
+            }
+            @if (canDraft && nextSigner != null && c.LifecycleStatus is LifecycleStatus.AwaitingSignature or LifecycleStatus.PartiallySigned)
+            {
+                <form asp-action="SignNext" asp-route-id="@c.Id" method="post" class="mb-3">
+                    <button class="btn btn-primary" type="submit">Record signature for @nextSigner.Name</button>
+                </form>
+            }
+            @if (canDraft && c.LifecycleStatus is LifecycleStatus.Approved or LifecycleStatus.AwaitingSignature or LifecycleStatus.PartiallySigned)
+            {
+                <form asp-action="ManualExecute" asp-route-id="@c.Id" method="post" enctype="multipart/form-data">
+                    <h3 class="h6">Manual execution</h3>
+                    <input class="form-control mb-2" type="date" name="executionDate" required />
+                    <input class="form-control mb-2" name="signatories" placeholder="Signatory names" required />
+                    <input class="form-control mb-2" type="file" name="file" required />
+                    <button class="btn btn-outline-dark" type="submit">Upload executed copy</button>
+                </form>
+            }
+        </section>
+
+        @if (canTriage && !c.DocumentLocked)
+        {
+            <section class="panel">
+                <h2>Lawyer</h2>
+                <form asp-action="Assign" asp-route-id="@c.Id" method="post" class="row g-2">
+                    <div class="col-12">
+                        <select class="form-select" name="lawyerId" required>
+                            <option value="">Assign</option>
+                            @foreach (var lawyer in Model.Lawyers)
+                            {
+                                <option value="@lawyer.Id">@lawyer.Name</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-12"><input class="form-control" name="reason" placeholder="Reason, required on reassignment" /></div>
+                    <div class="col-12"><button class="btn btn-outline-dark" type="submit">Assign</button></div>
+                </form>
+                @if (c.LifecycleStatus is LifecycleStatus.LegalReview or LifecycleStatus.Drafting or LifecycleStatus.Negotiation)
+                {
+                    <form asp-action="Return" asp-route-id="@c.Id" method="post" class="mt-3">
+                        <textarea class="form-control mb-2" name="note" rows="2" placeholder="What should the requestor clarify?"></textarea>
+                        <button class="btn btn-outline-dark" type="submit">Return for clarification</button>
+                    </form>
+                }
+            </section>
+        }
+        @if (c.Assignments.Count > 0)
+        {
+            <section class="panel">
+                <h2>Assignment history</h2>
+                <ul class="mb-0">
+                @foreach (var assignment in c.Assignments.OrderByDescending(a => a.AssignedAt))
+                {
+                    <li>@assignment.AssignedAt.ToLocalTime().ToString("dd MMM yyyy") — @(assignment.FromLawyer?.Name ?? "Unassigned") to @assignment.ToLawyer.Name by @assignment.AssignedBy.Name. @assignment.Reason</li>
+                }
+                </ul>
+            </section>
+        }
+
+        <section class="panel">
+            <h2>Linked agreements</h2>
+            @if (Model.Children.Count == 0 && c.ParentContract == null)
+            {
+                <div class="empty">No renewal or amendment points here yet.</div>
+            }
+            <ul class="mb-0">
+            @foreach (var child in Model.Children)
+            {
+                <li><a asp-action="Details" asp-route-id="@child.Id">@child.PublicId</a> @child.ContractName · @Labels.Text(child.RequestNature)</li>
+            }
+            </ul>
+        </section>
+    </div>
+</div>
+
+<section class="panel">
+    <h2>Obligations and milestones</h2>
+    @if (c.Obligations.Count == 0)
+    {
+        <div class="empty">None recorded.</div>
+    }
+    <ul>
+    @foreach (var item in c.Obligations.OrderBy(o => o.DueDate))
+    {
+        var overdue = item.Status == ObligationStatus.Open && item.DueDate < DateOnly.FromDateTime(DateTime.UtcNow);
+        <li class="mb-2">
+            <strong>@(item.MilestoneKind == MilestoneKind.General ? item.Description : Labels.Text(item.MilestoneKind))</strong>
+            @if (item.MilestoneKind != MilestoneKind.General) { <span> — @item.Description</span> }
+            <div class="age">@item.DueDate.ToString("dd MMM yyyy") · @item.Owner.Name · @item.Status @(item.IsMandatory ? "· mandatory" : "") @(overdue ? "· overdue" : "")</div>
+            @if (!string.IsNullOrWhiteSpace(item.EvidenceNote)) { <div>@item.EvidenceNote</div> }
+            @if (item.Status == ObligationStatus.Open && (Model.Viewer.Id == item.OwnerId || canObligations || canDraft))
+            {
+                <form asp-action="CompleteObligation" asp-route-id="@c.Id" method="post" class="row g-2 mt-1">
+                    <input type="hidden" name="obligationId" value="@item.Id" />
+                    <div class="col-md-8"><input class="form-control" name="evidence" placeholder="Evidence or note" /></div>
+                    <div class="col-md-4"><button class="btn btn-sm btn-outline-dark" type="submit">Mark complete</button></div>
+                </form>
+            }
+        </li>
+    }
+    </ul>
+    @if (canObligations)
+    {
+        <form asp-action="AddObligation" asp-route-id="@c.Id" method="post" class="row g-2">
+            <div class="col-md-4"><input class="form-control" name="description" placeholder="Obligation" required /></div>
+            <div class="col-md-3">
+                <select class="form-select" name="kind">
+                    @foreach (MilestoneKind kind in Enum.GetValues<MilestoneKind>())
+                    {
+                        <option value="@kind">@Labels.Text(kind)</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-3">
+                <select class="form-select" name="ownerId" required>
+                    @foreach (var person in Model.People)
+                    {
+                        <option value="@person.Id">@person.Name</option>
+                    }
+                </select>
+            </div>
+            <div class="col-md-2"><input class="form-control" type="date" name="due" required /></div>
+            <div class="col-md-4 form-check ms-2"><input class="form-check-input" type="checkbox" name="mandatory" value="true" checked id="mandatory" /><label class="form-check-label" for="mandatory">Mandatory before close</label></div>
+            <div class="col-md-3"><button class="btn btn-outline-dark" type="submit">Add obligation</button></div>
+        </form>
+    }
+</section>
+
+<div class="row g-3">
+    <div class="col-lg-6">
+        <section class="panel">
+            <h2>Rights</h2>
+            @if (c.Rights.Count == 0) { <div class="empty">No territorial window yet.</div> }
+            <ul>
+            @foreach (var right in c.Rights.OrderBy(r => r.WindowEnd))
+            {
+                <li>@right.RightType · @right.Territory · @right.Exclusivity<div class="age">@right.WindowStart.ToString("dd MMM yyyy") – @right.WindowEnd.ToString("dd MMM yyyy") · @right.Counterparty</div></li>
+            }
+            </ul>
+            @if (canObligations || (canDraft && c.LifecycleStatus is LifecycleStatus.ExecutedActive or LifecycleStatus.RenewalReview))
+            {
+                <form asp-action="AddRights" asp-route-id="@c.Id" method="post" class="row g-2">
+                    <div class="col-md-6"><input class="form-control" name="rightType" placeholder="Right" required /></div>
+                    <div class="col-md-6"><input class="form-control" name="territory" placeholder="Territory" required /></div>
+                    <div class="col-md-6"><input class="form-control" type="date" name="start" required /></div>
+                    <div class="col-md-6"><input class="form-control" type="date" name="end" required /></div>
+                    <div class="col-md-6"><input class="form-control" name="exclusivity" placeholder="Exclusive or restricted" required /></div>
+                    <div class="col-md-6"><input class="form-control" name="counterparty" placeholder="Counterparty" /></div>
+                    <div class="col-12"><button class="btn btn-outline-dark" type="submit">Save rights window</button></div>
+                </form>
+            }
+        </section>
+    </div>
+    <div class="col-lg-6">
+        <section class="panel">
+            <h2>Critical dates</h2>
+            @if (c.CriticalDates.Count == 0) { <div class="empty">No option, notice, or renewal date yet.</div> }
+            <ul>
+            @foreach (var date in c.CriticalDates.OrderBy(d => d.Date))
+            {
+                <li>@Labels.Text(date.Kind) · @date.Date.ToString("dd MMM yyyy")<div class="age">@date.Note</div></li>
+            }
+            </ul>
+            @if (canObligations || (canDraft && c.LifecycleStatus is LifecycleStatus.ExecutedActive or LifecycleStatus.RenewalReview))
+            {
+                <form asp-action="AddCriticalDate" asp-route-id="@c.Id" method="post" class="row g-2">
+                    <div class="col-md-5">
+                        <select class="form-select" name="kind">
+                            @foreach (CriticalDateKind kind in Enum.GetValues<CriticalDateKind>())
+                            {
+                                <option value="@kind">@Labels.Text(kind)</option>
+                            }
+                        </select>
+                    </div>
+                    <div class="col-md-4"><input class="form-control" type="date" name="date" required /></div>
+                    <div class="col-md-3"><button class="btn btn-outline-dark w-100" type="submit">Add</button></div>
+                    <div class="col-12"><input class="form-control" name="note" placeholder="Note" /></div>
+                </form>
+            }
+        </section>
+    </div>
+</div>
+
+<section class="panel">
+    <h2>Related documents</h2>
+    <ul>
+    @foreach (var document in c.RelatedDocuments.OrderByDescending(d => d.UploadedAt))
+    {
+        <li><a asp-action="DownloadRelated" asp-route-id="@document.Id">@document.FileName</a> · @Labels.Text(document.Kind) · @document.UploadedBy.Name</li>
+    }
+    </ul>
+    @if (canDraft || canTriage || Model.Viewer.Id == c.InitiatorId)
+    {
+        <form asp-action="AddRelated" asp-route-id="@c.Id" method="post" enctype="multipart/form-data" class="row g-2">
+            <div class="col-md-4">
+                <select class="form-select" name="kind">
+                    <option value="Appendix">Appendix</option>
+                    <option value="Nda">NDA</option>
+                    <option value="Privacy">Privacy</option>
+                    <option value="Other">Other</option>
+                </select>
+            </div>
+            <div class="col-md-5"><input class="form-control" type="file" name="file" required /></div>
+            <div class="col-md-3"><button class="btn btn-outline-dark w-100" type="submit">Attach</button></div>
+        </form>
+    }
+</section>
+
+@if (Model.BusinessCentral != null)
+{
+    var bc = Model.BusinessCentral;
+    <section class="panel">
+        <h2>Business Central</h2>
+        <p>Dynamics 365 is not connected. This is the metadata Finance and Procurement would receive. The contract file, versions, and approvals stay in this record.</p>
+        <dl class="sheet row">
+            <div class="col-md-4"><dt>Agreement</dt><dd>@bc.AgreementId</dd></div>
+            <div class="col-md-4"><dt>Counterparty</dt><dd>@bc.Counterparty</dd></div>
+            <div class="col-md-4"><dt>Department / project</dt><dd>@bc.Department · @bc.Project</dd></div>
+            <div class="col-md-4"><dt>Value</dt><dd>@bc.Value.ToString("N2") @bc.Currency</dd></div>
+            <div class="col-md-4"><dt>Effective / expiry</dt><dd>@(bc.Effective?.ToString("dd MMM yyyy") ?? "—") / @(bc.Expiry?.ToString("dd MMM yyyy") ?? "—")</dd></div>
+            <div class="col-md-4"><dt>Status</dt><dd>@bc.Status</dd></div>
+            <div class="col-md-4"><dt>Last local marker</dt><dd>@(bc.LastSyncAt?.ToLocalTime().ToString("dd MMM yyyy HH:mm") ?? "Not recorded")</dd></div>
+        </dl>
+        @if (canDraft || canTriage)
+        {
+            <form asp-action="SyncBc" asp-route-id="@c.Id" method="post">
+                <button class="btn btn-outline-dark" type="submit">Record a local sync marker</button>
+            </form>
+        }
+    </section>
+}
+
+@if (canDraft || canTriage)
+{
+    <section class="panel">
+        <h2>Close, expire, or supersede</h2>
+        <div class="row g-3">
+            @if (c.LifecycleStatus is LifecycleStatus.ExecutedActive or LifecycleStatus.RenewalReview)
+            {
+                <div class="col-md-4">
+                    <form asp-action="Expire" asp-route-id="@c.Id" method="post">
+                        <button class="btn btn-outline-dark" type="submit">Mark expired</button>
+                    </form>
+                </div>
+                <div class="col-md-8">
+                    <form asp-action="Supersede" asp-route-id="@c.Id" method="post" class="row g-2">
+                        <div class="col-8">
+                            <select class="form-select" name="childId">
+                                <option value="">Superseded by…</option>
+                                @foreach (var child in Model.Children)
+                                {
+                                    <option value="@child.Id">@child.PublicId</option>
+                                }
+                            </select>
+                        </div>
+                        <div class="col-4"><button class="btn btn-outline-dark w-100" type="submit">Supersede</button></div>
+                    </form>
+                </div>
+            }
+            @if (c.LifecycleStatus is not (LifecycleStatus.Closed or LifecycleStatus.Superseded))
+            {
+                <div class="col-12">
+                    <form asp-action="Close" asp-route-id="@c.Id" method="post" class="row g-2">
+                        <div class="col-md-9"><input class="form-control" name="reason" placeholder="Override reason if mandatory obligations are still open" /></div>
+                        <div class="col-md-3"><button class="btn btn-outline-dark w-100" type="submit">Close record</button></div>
+                    </form>
+                </div>
+            }
+        </div>
+        @if (!string.IsNullOrWhiteSpace(c.ClosureOverrideReason))
+        {
+            <p class="mt-2 mb-0">Closure note: @c.ClosureOverrideReason</p>
+        }
+    </section>
+}
+
+<section class="panel">
+    <h2>Audit</h2>
+    <ul class="mb-0">
+    @foreach (var entry in c.AuditEvents.OrderByDescending(a => a.CreatedAt))
+    {
+        <li class="mb-2"><strong>@entry.Action</strong> · @entry.Actor.Name <span class="age">@entry.CreatedAt.ToLocalTime().ToString("dd MMM yyyy HH:mm")</span><div>@entry.Detail</div></li>
+    }
+    </ul>
+</section>

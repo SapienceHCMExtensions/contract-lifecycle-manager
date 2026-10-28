@@ -1,0 +1,10 @@
+@model QueuePage
+@{
+    ViewData["Title"] = Model.Title;
+}
+<p class="kicker">Legal</p>
+<h1>@Model.Title</h1>
+<p class="lede">@Model.Intro</p>
+<section class="panel">
+    <partial name="_ContractTable" model="Model.Rows" />
+</section>

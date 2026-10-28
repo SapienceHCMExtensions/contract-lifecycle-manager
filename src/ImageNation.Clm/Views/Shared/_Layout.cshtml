@@ -1,0 +1,80 @@
+﻿@{
+    var persona = ViewData["Persona"] as AppUser;
+    var unread = ViewData["Unread"] as int? ?? 0;
+}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>@ViewData["Title"] — Image Nation</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,520;9..144,640&family=Source+Sans+3:wght@400;600;700&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="~/lib/bootstrap/dist/css/bootstrap.min.css" />
+    <link rel="stylesheet" href="~/css/site.css" asp-append-version="true" />
+</head>
+<body>
+    <a class="skip" href="#main">Skip to content</a>
+    <header class="site-header">
+        <nav class="navbar navbar-expand-lg">
+            <div class="container-xl">
+                <a class="navbar-brand" asp-controller="Dashboard" asp-action="Index">Image Nation <span>Contracts</span></a>
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#nav" aria-controls="nav" aria-expanded="false" aria-label="Open menu">
+                    <span class="navbar-toggler-icon"></span>
+                </button>
+                <div class="collapse navbar-collapse" id="nav">
+                    @if (persona != null)
+                    {
+                        <ul class="navbar-nav me-auto">
+                            <li class="nav-item"><a class="nav-link" asp-controller="Dashboard" asp-action="Index">Dashboard</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Contracts" asp-action="Index">Register</a></li>
+                            <li class="nav-item"><a class="nav-link" asp-controller="Projects" asp-action="Index">Titles</a></li>
+                            @if (persona.Role is UserRole.Lawyer or UserRole.LegalTriage or UserRole.HeadOfLegal or UserRole.Admin)
+                            {
+                                <li class="nav-item"><a class="nav-link" asp-controller="Queues" asp-action="Index">Queue</a></li>
+                            }
+                            <li class="nav-item"><a class="nav-link" asp-controller="Approvals" asp-action="Index">Approvals</a></li>
+                            @if (persona.Role == UserRole.Admin)
+                            {
+                                <li class="nav-item"><a class="nav-link" asp-controller="Admin" asp-action="Index">Settings</a></li>
+                            }
+                        </ul>
+                        <div class="persona">
+                            @if (unread > 0)
+                            {
+                                <a class="notice-count" asp-controller="Dashboard" asp-action="Index">@unread new</a>
+                            }
+                            <div>
+                                <strong>@persona.Name</strong>
+                                <small>@Labels.Text(persona.Role) · @persona.Department</small>
+                            </div>
+                            <a class="nav-link" asp-controller="Account" asp-action="Index">Switch</a>
+                            <form asp-controller="Account" asp-action="SignOutPersona" method="post">
+                                <button type="submit" class="btn btn-sm btn-link signout">Sign out</button>
+                            </form>
+                        </div>
+                    }
+                </div>
+            </div>
+        </nav>
+    </header>
+    <main id="main" class="container-xl py-4">
+        @if (TempData["Success"] is string ok)
+        {
+            <div class="alert alert-success" role="status">@ok</div>
+        }
+        @if (TempData["Error"] is string err)
+        {
+            <div class="alert alert-danger" role="alert">@err</div>
+        }
+        @RenderBody()
+    </main>
+    <footer class="site-footer">
+        <div class="container-xl">Image Nation Abu Dhabi · Contract lifecycle · Local demonstration. Microsoft 365, DocuSign, and Business Central are not connected.</div>
+    </footer>
+    <script src="~/lib/bootstrap/dist/js/bootstrap.bundle.min.js"></script>
+    <script src="~/js/site.js" asp-append-version="true"></script>
+    @await RenderSectionAsync("Scripts", required: false)
+</body>
+</html>

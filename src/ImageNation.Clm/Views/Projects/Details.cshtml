@@ -1,0 +1,11 @@
+@model ProjectDetailsPage
+@{
+    ViewData["Title"] = Model.Project.Name;
+}
+<p class="kicker">@Model.Project.InternalCode</p>
+<h1>@Model.Project.Name</h1>
+<p class="lede">@Model.Project.Status · @Model.Project.ProductionEntity · Business owner @Model.Project.BusinessOwner</p>
+<section class="panel">
+    <partial name="_ContractTable" model="Model.Agreements" />
+</section>
+<a class="btn btn-outline-dark" asp-action="Index">All titles</a>
